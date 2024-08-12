@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -13,6 +12,28 @@ import (
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
+
+var revisores = map[string][]string{
+	"Daniel": {
+		"JARDIM DAS LARANJEIRAS",
+		"CASA GRANDE",
+		"JARDIM DOS VELEIROS",
+		"JARDIM DOS ALAMOS",
+	},
+	"Phellipe": {
+		"VILA ESPERANCA",
+		"VILA SAO JOSE",
+		"PARQUE FLORESTAL",
+		"JARDIM IPORANGA",
+		"FAZENDA DO SCHUNK",
+	},
+	"Fabio": {
+		"RECANTO DOS NOBRES",
+		"JARDIM LALO",
+		"JARDIM GUANHEMBU",
+		"INTERLAGOS",
+	},
+}
 
 type Summary struct {
 	TotalTrabalhos int
@@ -36,14 +57,6 @@ func extractMiddleName(localidade string) string {
 	return localidade
 }
 
-func createKeyValuePairs(m map[string]bool) string {
-	b := new(bytes.Buffer)
-	for key, value := range m {
-		fmt.Fprintf(b, "%s=\"%s\"\n", key, value)
-	}
-	return b.String()
-}
-
 func readBooksFile(filePath string) (map[string]map[string]bool, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -59,9 +72,14 @@ func readBooksFile(filePath string) (map[string]map[string]bool, error) {
 	}
 
 	booksMap := make(map[string]map[string]bool)
-	for _, record := range records[1:] {
+	newsRecords := records[12:]
+	for _, record := range newsRecords[12:] {
 		livro := strings.TrimSpace(record[0])
 		localidade := strings.TrimSpace(removeAccents(record[2]))
+
+		if livro == "" {
+			continue
+		}
 
 		if _, exists := booksMap[localidade]; !exists {
 			booksMap[localidade] = make(map[string]bool)
@@ -120,18 +138,27 @@ func main() {
 		livrosEncontrados[livro] = true
 	}
 
-	// Cria o PDF
-	pdf := gofpdf.New("P", "mm", "A4", "")
-	tr := pdf.UnicodeTranslatorFromDescriptor("")
-	pdf.SetFont("Arial", "", 12)
-	pdf.SetTitle("Relatório de Localidades", true)
-	pdf.SetAuthor("Phellipe Rodrigues", true)
+	for localidade, livros := range booksMap {
 
-	pageWidth, _ := pdf.GetPageSize()
-	margin := 10.0
-	usableWidth := pageWidth - 2*margin
+		// Cria o PDF
+		pdf := gofpdf.New("P", "mm", "A4", "")
+		tr := pdf.UnicodeTranslatorFromDescriptor("")
+		pdf.SetFont("Arial", "", 12)
+		pdf.SetTitle("Relatório de Localidades", true)
+		pdf.SetAuthor("Phellipe Rodrigues", true)
 
-	for localidade, livros := range data {
+		pageWidth, _ := pdf.GetPageSize()
+		margin := 10.0
+		usableWidth := pageWidth - 2*margin
+
+		// Verifica se a localidade existe em data; caso contrário, inicializa com todos os valores zerados
+		if _, exists := data[localidade]; !exists {
+			data[localidade] = make(map[string]*Summary)
+			for livro := range livros {
+				data[localidade][livro] = &Summary{TotalTrabalhos: 0}
+			}
+		}
+
 		pdf.AddPage()
 
 		// Título da localidade
@@ -166,29 +193,26 @@ func main() {
 		// Dados da tabela
 		pdf.SetFont("Arial", "", 12)
 		for livro := range livrosEncontrados {
-
-			summary, exists := livros[livro]
+			summary, exists := data[localidade][livro]
 			totalTrabalhos := 0
 			if exists {
 				totalTrabalhos = summary.TotalTrabalhos
 			}
-
+			if livro == "" {
+				continue
+			}
 			bookName := livro[4:]
-
-			for book, _ := range booksMap[localidade] {
+			for book := range booksMap[localidade] {
 				if strings.Contains(bookName, book) {
 					if totalTrabalhos < 1 {
 						pdf.SetTextColor(255, 0, 0)
-
 					}
 					pdf.CellFormat(larguraLivro, 7, tr(bookName), "1", 0, "", false, 0, "")
 					pdf.CellFormat(larguraTotalTrabalhos, 7, fmt.Sprintf("%d", totalTrabalhos), "1", 0, "C", false, 0, "")
 					pdf.CellFormat(larguraSomaHoras, 7, "", "1", 1, "R", false, 0, "")
 					pdf.SetTextColor(0, 0, 0) // Reseta a cor do texto
-
 				}
 			}
-
 		}
 
 		pdf.Ln(10)
@@ -200,9 +224,9 @@ func main() {
 
 		// Adiciona alertas
 		pdf.SetFont("Arial", "B", 12)
-		_, adminExists := livros["4 - ADMINISTRAÇÃO"]
-		mp, manutencaoExists := livros["2 - MANUTENÇÃO PREVENTIVA"]
-		_, brigadaExists := livros["4 - BRIGADA DE INCÊNDIO"]
+		_, adminExists := data[localidade]["4 - ADMINISTRAÇÃO"]
+		mp, manutencaoExists := data[localidade]["2 - MANUTENÇÃO PREVENTIVA"]
+		_, brigadaExists := data[localidade]["4 - BRIGADA DE INCÊNDIO"]
 
 		if !adminExists || (!manutencaoExists || mp.TotalTrabalhos < 8) || !brigadaExists {
 			pdf.SetTextColor(255, 0, 0)
@@ -220,32 +244,49 @@ func main() {
 			pdf.SetTextColor(237, 81, 14)
 			pdf.MultiCell(0, 8, tr("> Não há apontamentos de BRIGADA DE INCENDIO."), "", "", false)
 		}
-		pdf.Ln(30)
-
 		pdf.SetTextColor(0, 0, 0) // Reseta a cor do texto
-		pdf.SetFont("Arial", "B", 12)
-		pdf.CellFormat(190, 7, tr("Observações"), "1", 0, "C", false, 0, "")
-		pdf.SetFont("Arial", "", 12)
-		pdf.Ln(7)
-		pdf.CellFormat(190, 8, "", "1", 0, "", false, 0, "")
-		pdf.Ln(8)
-		pdf.CellFormat(190, 8, "", "1", 0, "", false, 0, "")
-		pdf.Ln(8)
-		pdf.CellFormat(190, 8, "", "1", 0, "", false, 0, "")
-		pdf.Ln(8)
-		pdf.CellFormat(190, 8, "", "1", 0, "", false, 0, "")
-		pdf.Ln(8)
-		pdf.CellFormat(190, 8, "", "1", 0, "", false, 0, "")
+		pdf.Ln(30)
+		// Adicionar linhas de observacões
+		pdf.CellFormat(190, 7, tr("OBSERVACÕES"), "1", 1, "C", false, 0, "")
+		for i := 0; i < 10; i++ {
+			pdf.CellFormat(190, 7, "", "1", 1, "C", false, 0, "")
+		}
 
-		//err = pdf.OutputFileAndClose(fmt.Sprintf("./files/output/relatorio-%s.pdf", tr(localidade)))
-		//if err != nil {
-		//	fmt.Println("Erro ao salvar o PDF:", err)
-		//}
+		// Verifica se a localidade está associada a algum revisor
+		diretorioDestino := "./files/output/outros"
+		for revisor, localidades := range revisores {
+			for _, loc := range localidades {
+				if localidade == loc {
+					diretorioDestino = fmt.Sprintf("./files/output/%s", revisor)
+					break
+				}
+			}
+			if diretorioDestino != "./files/output/outros" {
+				break
+			}
+		}
+
+		// Cria o diretório se não existir
+		if _, err := os.Stat(diretorioDestino); os.IsNotExist(err) {
+			err = os.MkdirAll(diretorioDestino, os.ModePerm)
+			if err != nil {
+				fmt.Println("Erro ao criar diretório:", err)
+				return
+			}
+		}
+
+		// Salva o arquivo PDF no diretório apropriado
+		err = pdf.OutputFileAndClose(fmt.Sprintf("%s/relatorio-%s.pdf", diretorioDestino, strings.ToLower(localidade)))
+		if err != nil {
+			fmt.Println("Erro ao salvar o arquivo PDF:", err)
+			return
+		}
 	}
-	err = pdf.OutputFileAndClose(fmt.Sprintf("./files/relatorio.pdf"))
-	if err != nil {
-		fmt.Println("Erro ao salvar o PDF:", err)
-	}
+
+	// Salva o arquivo PDF
+
+	fmt.Println("Relatório gerado com sucesso!")
+
 }
 
 func maxFloat64(a, b float64) float64 {
