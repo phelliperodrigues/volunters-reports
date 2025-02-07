@@ -33,6 +33,37 @@ var revisores = map[string][]string{
 		"JARDIM GUANHEMBU",
 		"INTERLAGOS",
 	},
+	"Setor 9.2": {
+		"CHACARA MARIETA",
+		"CHACARAS SANTO AMARO",
+		"ILHA DO BORORE",
+		"ITAIM",
+		"JARDIM ELIANE",
+		"JARDIM LUCELIA",
+		"JARDIM MARILDA",
+		"JARDIM SANTA BARBARA",
+		"JARDIM SAO BERNARDO",
+		"JARDIM SAO RAFAEL",
+		"JARDIM SETE DE SETEMBRO",
+		"JARDIM TRES CORACOES",
+		"PARQUE GRAJAU",
+		"PARQUE RESIDENCIAL COCAIA",
+	},
+	"Setor 9.3": {
+		"BARRAGEM",
+		"CIDADE NOVA AMERICA",
+		"COLONIA PAULISTA",
+		"EMBURA",
+		"ESTACAO EVANGELISTA DE SOUZA",
+		"JARDIM DAS FONTES",
+		"ENGENHEIRO MARSILAC",
+		"PARELHEIROS",
+		"PONTE SECA",
+		"RECANTO ANA MARIA",
+		"JARDIM SAO NORBERTO",
+		"VARGEM GRANDE",
+		"VILA ROSCHEL",
+	},
 }
 
 type Summary struct {
@@ -72,8 +103,7 @@ func readBooksFile(filePath string) (map[string]map[string]bool, error) {
 	}
 
 	booksMap := make(map[string]map[string]bool)
-	newsRecords := records[12:]
-	for _, record := range newsRecords[12:] {
+	for _, record := range records[12:] {
 		livro := strings.TrimSpace(record[0])
 		localidade := strings.TrimSpace(removeAccents(record[2]))
 
@@ -92,7 +122,7 @@ func readBooksFile(filePath string) (map[string]map[string]bool, error) {
 }
 
 func main() {
-	filePath := "./files/imput.csv"
+	filePath := "./files/input.csv"
 	booksFilePath := "./files/books.csv"
 
 	// Lê a lista de livros e localizações
@@ -122,10 +152,12 @@ func main() {
 	livrosEncontrados := make(map[string]bool)
 
 	// Percorre os registros a partir da segunda linha (ignorando o cabeçalho)
-	for _, record := range records[1:] {
+	for _, record := range records[12:] {
 		localidade := extractMiddleName(removeAccents(record[0]))
 		livro := strings.TrimSpace(record[2])
-
+		if livro == "" {
+			continue
+		}
 		if _, exists := data[localidade]; !exists {
 			data[localidade] = make(map[string]*Summary)
 		}
@@ -187,7 +219,7 @@ func main() {
 		// Cabeçalhos da tabela
 		pdf.SetFont("Arial", "B", 12)
 		pdf.CellFormat(larguraLivro, 7, "Livro", "1", 0, "C", false, 0, "")
-		pdf.CellFormat(larguraTotalTrabalhos, 7, tr("Total Lancados"), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(larguraTotalTrabalhos, 7, tr("Total Lançados"), "1", 0, "C", false, 0, "")
 		pdf.CellFormat(larguraSomaHoras, 7, "Apontamentos", "1", 1, "C", false, 0, "")
 
 		// Dados da tabela
@@ -247,7 +279,7 @@ func main() {
 		pdf.SetTextColor(0, 0, 0) // Reseta a cor do texto
 		pdf.Ln(30)
 		// Adicionar linhas de observacões
-		pdf.CellFormat(190, 7, tr("OBSERVACÕES"), "1", 1, "C", false, 0, "")
+		pdf.CellFormat(190, 7, tr("OBSERVAÇÕES"), "1", 1, "C", false, 0, "")
 		for i := 0; i < 10; i++ {
 			pdf.CellFormat(190, 7, "", "1", 1, "C", false, 0, "")
 		}
@@ -283,8 +315,6 @@ func main() {
 		}
 	}
 
-	// Salva o arquivo PDF
-
 	fmt.Println("Relatório gerado com sucesso!")
 
 }
@@ -294,4 +324,68 @@ func maxFloat64(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+func generateSummaryPDF(data map[string]map[string]*Summary, booksMap map[string]map[string]bool) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	tr := pdf.UnicodeTranslatorFromDescriptor("")
+
+	pdf.SetFont("Arial", "", 8)
+	pdf.SetTitle("Resumo de Todas as Localidades", true)
+	pdf.SetAuthor("Phellipe Rodrigues", true)
+	pdf.AddPage()
+
+	// Cabeçalhos
+	pdf.SetFont("Arial", "B", 8)
+	pdf.CellFormat(50, 50, "Localidade", "1", 0, "C", false, 0, "")
+
+	// Cabeçalhos das colunas para os livros
+	livrosEncontrados := make(map[string]bool)
+	for _, livros := range booksMap {
+		for livro := range livros {
+			livrosEncontrados[livro] = true
+		}
+	}
+
+	livroOrdem := []string{}
+	for livro := range livrosEncontrados {
+		livroOrdem = append(livroOrdem, livro)
+
+		// Início da transformação para rotacionar o texto
+		x, y := pdf.GetXY()
+		pdf.TransformBegin()
+		pdf.TransformRotate(90, x+0.5, y+22.5)
+		pdf.CellFormat(12, 50, tr(livro), "", 0, "C", false, 0, "")
+		pdf.TransformEnd()
+		pdf.SetXY(x+7, y) // Ajusta a posição para o próximo título de livro
+	}
+	pdf.Ln(-1)
+
+	// Dados
+	pdf.SetFont("Arial", "", 8)
+	for localidade, livros := range data {
+		pdf.CellFormat(50, 5, localidade, "1", 0, "", false, 0, "")
+
+		for _, livro := range livroOrdem {
+			if summary, exists := livros[livro]; exists {
+				if summary.TotalTrabalhos == 0 {
+					pdf.SetTextColor(255, 0, 0)
+				}
+				pdf.CellFormat(7, 5, fmt.Sprintf("%d", summary.TotalTrabalhos), "1", 0, "C", false, 0, "")
+				pdf.SetTextColor(0, 0, 0) // Reset para a próxima célula
+			} else {
+				pdf.CellFormat(7, 5, "X", "1", 0, "C", false, 0, "")
+			}
+		}
+		pdf.Ln(-1)
+	}
+
+	// Salva o arquivo PDF no diretório apropriado
+	err := pdf.OutputFileAndClose("./files/output/resumo_localidades.pdf")
+	if err != nil {
+		fmt.Println("Erro ao salvar o arquivo PDF:", err)
+		return
+	}
+
+	fmt.Println("Relatório de resumo gerado com sucesso!")
 }

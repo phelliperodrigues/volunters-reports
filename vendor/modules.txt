@@ -1,0 +1,7 @@
+# github.com/jung-kurt/gofpdf/v2 v2.17.3
+## explicit; go 1.16
+github.com/jung-kurt/gofpdf/v2
+# golang.org/x/text v0.14.0
+## explicit; go 1.18
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
