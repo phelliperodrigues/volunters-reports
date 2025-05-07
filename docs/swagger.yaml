@@ -1,0 +1,142 @@
+openapi: 3.0.0
+info:
+  title: CCB Report Generator API
+  description: API para geração de relatórios
+  version: 0.1.0
+  contact:
+    name: Phellipe Rodrigues
+    url: https://github.com/phelliperodrigues/ccb-report
+
+servers:
+  - url: http://localhost:8080/api
+    description: Servidor local
+
+paths:
+  /reports/{localidade}:
+    post:
+      summary: Gera um novo relatório
+      description: Gera um relatório para a localidade especificada
+      parameters:
+        - name: localidade
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nome da localidade
+      responses:
+        '200':
+          description: Relatório gerado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '400':
+          description: Localidade inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erro interno do servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    get:
+      summary: Obtém um relatório existente
+      description: Obtém um relatório para a localidade especificada
+      parameters:
+        - name: localidade
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Nome da localidade
+      responses:
+        '200':
+          description: Relatório encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          description: Relatório não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Erro interno do servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /reports:
+    get:
+      summary: Lista todos os relatórios
+      description: Obtém uma lista de todos os relatórios disponíveis
+      responses:
+        '200':
+          description: Lista de relatórios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+        '500':
+          description: Erro interno do servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Report:
+      type: object
+      properties:
+        localidade:
+          type: string
+          description: Nome da localidade
+        livros:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/BookSummary'
+          description: Mapa de livros e seus resumos
+        dataGeracao:
+          type: string
+          format: date-time
+          description: Data de geração do relatório
+        totalTrabalhos:
+          type: integer
+          description: Total de trabalhos no relatório
+      required:
+        - localidade
+        - livros
+        - dataGeracao
+        - totalTrabalhos
+
+    BookSummary:
+      type: object
+      properties:
+        nome:
+          type: string
+          description: Nome do livro
+        totalTrabalhos:
+          type: integer
+          description: Total de trabalhos para este livro
+      required:
+        - nome
+        - totalTrabalhos
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro
+      required:
+        - error 
