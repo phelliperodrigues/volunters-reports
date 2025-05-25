@@ -49,7 +49,7 @@ func (g *ReportGenerator) GenerateReports() error {
 			return fmt.Errorf("erro ao obter setor para localidade %s: %v", localidade, err)
 		}
 
-		err = g.generateLocalidadeReport(localidade, dadosLocalidade, livros[localidade], setor)
+		err = g.generateLocalidadeReport(localidade, dadosLocalidade, setor)
 		if err != nil {
 			return fmt.Errorf("erro ao gerar relatório para localidade %s: %v", localidade, err)
 		}
@@ -67,7 +67,6 @@ func (g *ReportGenerator) GenerateReports() error {
 func (g *ReportGenerator) generateLocalidadeReport(
 	localidade string,
 	dados map[string]*domain.Summary,
-	livrosPermitidos map[string]bool,
 	setor *domain.Setor,
 ) error {
 	config := &domain.RelatorioConfig{
