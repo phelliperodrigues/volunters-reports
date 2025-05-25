@@ -1,6 +1,6 @@
-module github.com/phelliperodrigues/ccb-report
+module report
 
-go 1.22.5
+go 1.21
 
 require (
 	github.com/jung-kurt/gofpdf/v2 v2.17.3
